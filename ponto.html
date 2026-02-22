@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Banco de Horas</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: #2a2a3e;
+    --accent: #00e5a0;
+    --accent2: #ff4d6d;
+    --accent3: #ffd60a;
+    --text: #e8e8f0;
+    --muted: #6b6b8a;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+
+  .noise {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.4;
+  }
+
+  .container { max-width: 700px; margin: 0 auto; position: relative; z-index: 1; }
+
+  header { margin-bottom: 32px; }
+
+  h1 {
+    font-family: var(--sans);
+    font-size: clamp(28px, 6vw, 42px);
+    font-weight: 800;
+    letter-spacing: -1px;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle { color: var(--muted); font-size: 12px; margin-top: 6px; }
+
+  /* Summary cards */
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 28px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+  }
+
+  .card-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
+
+  .card-value {
+    font-family: var(--sans);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .card-value.negative { color: var(--accent2); }
+  .card-value.neutral { color: var(--accent3); }
+
+  .card-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* Month nav */
+  .month-nav {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+  }
+
+  .month-nav button {
+    background: none; border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: var(--mono);
+    transition: all .15s;
+  }
+
+  .month-nav button:hover { border-color: var(--accent); color: var(--accent); }
+
+  #monthLabel { flex: 1; text-align: center; font-family: var(--sans); font-weight: 700; font-size: 16px; text-transform: uppercase; letter-spacing: 1px; }
+
+  /* Form */
+  .form-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+
+  .form-title { font-family: var(--sans); font-weight: 700; font-size: 14px; margin-bottom: 16px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+
+  label { display: block; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+
+  input[type="date"], input[type="time"], select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color .15s;
+    -webkit-appearance: none;
+  }
+
+  input:focus, select:focus { border-color: var(--accent); }
+
+  .btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 24px;
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    transition: opacity .15s, transform .1s;
+    letter-spacing: .5px;
+  }
+
+  .btn:hover { opacity: .85; }
+  .btn:active { transform: scale(.98); }
+
+  .btn-danger {
+    background: none;
+    border: 1px solid var(--accent2);
+    color: var(--accent2);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: var(--mono);
+    transition: all .15s;
+  }
+
+  .btn-danger:hover { background: var(--accent2); color: #fff; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+  thead tr { border-bottom: 1px solid var(--border); }
+
+  th { color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-size: 10px; padding: 10px 8px; text-align: left; font-weight: 400; }
+
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody tr:last-child { border-bottom: none; }
+
+  td { padding: 12px 8px; }
+
+  .badge {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .badge-pos { background: rgba(0,229,160,.15); color: var(--accent); }
+  .badge-neg { background: rgba(255,77,109,.15); color: var(--accent2); }
+  .badge-zero { background: rgba(255,214,10,.15); color: var(--accent3); }
+
+  .day-label { font-weight: 600; }
+  .day-sat { color: var(--accent3); }
+  .day-sun { color: var(--muted); font-style: italic; }
+
+  .empty { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
+
+  #status { font-size: 12px; margin-top: 10px; min-height: 18px; }
+  #status.ok { color: var(--accent); }
+  #status.err { color: var(--accent2); }
+
+  /* Obs input */
+  input[type="text"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color .15s;
+  }
+
+  input[type="text"]:focus { border-color: var(--accent); }
+
+  @media (max-width: 500px) {
+    .form-row { grid-template-columns: 1fr 1fr; }
+    .summary-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+<div class="container">
+
+  <header>
+    <h1>BANCO DE <span>HORAS</span></h1>
+    <p class="subtitle">Controle pessoal de jornada de trabalho</p>
+  </header>
+
+  <div class="summary-grid">
+    <div class="card">
+      <div class="card-label">Saldo do Mês</div>
+      <div class="card-value" id="saldoMes">+0h 00m</div>
+      <div class="card-sub" id="saldoDias">0 dias registrados</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Saldo Acumulado</div>
+      <div class="card-value" id="saldoTotal">+0h 00m</div>
+      <div class="card-sub">todos os meses</div>
+    </div>
+  </div>
+
+  <div class="month-nav">
+    <button onclick="changeMonth(-1)">&#8592;</button>
+    <div id="monthLabel"></div>
+    <button onclick="changeMonth(1)">&#8594;</button>
+  </div>
+
+  <div class="form-card">
+    <div class="form-title">&#9660; Registrar Ponto</div>
+    <div class="form-row">
+      <div>
+        <label>Data</label>
+        <input type="date" id="fData">
+      </div>
+      <div>
+        <label>Entrada</label>
+        <input type="time" id="fEntrada">
+      </div>
+      <div>
+        <label>Saída</label>
+        <input type="time" id="fSaida">
+      </div>
+    </div>
+    <div class="form-row" style="grid-template-columns:1fr 1fr;">
+      <div>
+        <label>Almoço (min)</label>
+        <input type="text" id="fAlmoco" value="90" placeholder="90">
+      </div>
+      <div>
+        <label>Observação</label>
+        <input type="text" id="fObs" placeholder="Opcional">
+      </div>
+    </div>
+    <button class="btn" onclick="salvar()">SALVAR PONTO</button>
+    <div id="status"></div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Dia</th>
+          <th>Entrada</th>
+          <th>Saída</th>
+          <th>Almoço</th>
+          <th>Trabalhado</th>
+          <th>Esperado</th>
+          <th>Saldo</th>
+          <th>Obs</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="10" class="empty">Nenhum registro neste mês.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCHDBdUi1-ze8fF-eGaWqBo-z0F_ARdGI0",
+  authDomain: "kiing-of-street.firebaseapp.com",
+  projectId: "kiing-of-street",
+  storageBucket: "kiing-of-street.firebasestorage.app",
+  messagingSenderId: "779262130062",
+  appId: "1:779262130062:web:a1de619cc1547d2b8196df"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// --- Horários esperados ---
+// Segunda a Sexta: entrada 06:30, saída 16:00, almoço 90min => 8h de trabalho líquido? 
+// 06:30 → 16:00 = 9h30 bruto - 1h30 almoço = 8h líquido
+// Sábado: 07:30 → 11:00 = 3h30 (sem almoço)
+const ESPERADO_SEMANA = 8 * 60; // 480 min
+const ESPERADO_SABADO = 3.5 * 60; // 210 min
+const DIAS_PT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+let currentDate = new Date();
+let currentYear = currentDate.getFullYear();
+let currentMonth = currentDate.getMonth();
+let registros = [];
+
+window.changeMonth = function(d) {
+  currentMonth += d;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  renderMonth();
+};
+
+function getEsperado(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const dow = d.getDay(); // 0=dom, 6=sab
+  if (dow === 0) return 0;
+  if (dow === 6) return ESPERADO_SABADO;
+  return ESPERADO_SEMANA;
+}
+
+function timeToMin(t) {
+  if (!t) return 0;
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function minToStr(m) {
+  const sign = m < 0 ? '-' : '+';
+  const abs = Math.abs(m);
+  const h = Math.floor(abs / 60);
+  const mn = abs % 60;
+  return `${sign}${h}h ${mn.toString().padStart(2,'0')}m`;
+}
+
+function workedMin(entrada, saida, almoco) {
+  const total = timeToMin(saida) - timeToMin(entrada);
+  return Math.max(0, total - Number(almoco));
+}
+
+async function loadAll() {
+  const snap = await getDocs(collection(db, 'pontos'));
+  registros = [];
+  snap.forEach(d => registros.push({ id: d.id, ...d.data() }));
+  renderMonth();
+  updateSaldoTotal();
+}
+
+function renderMonth() {
+  document.getElementById('monthLabel').textContent = `${MESES_PT[currentMonth]} ${currentYear}`;
+
+  const mes = registros.filter(r => {
+    const d = new Date(r.data + 'T12:00:00');
+    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+  }).sort((a, b) => a.data.localeCompare(b.data));
+
+  const tbody = document.getElementById('tbody');
+
+  if (!mes.length) {
+    tbody.innerHTML = `<tr><td colspan="10" class="empty">Nenhum registro neste mês.</td></tr>`;
+    document.getElementById('saldoMes').textContent = '+0h 00m';
+    document.getElementById('saldoDias').textContent = '0 dias registrados';
+    return;
+  }
+
+  let totalSaldo = 0;
+  tbody.innerHTML = mes.map(r => {
+    const dow = new Date(r.data + 'T12:00:00').getDay();
+    const diaLabel = DIAS_PT[dow];
+    const esperado = getEsperado(r.data);
+    const trabalhado = workedMin(r.entrada, r.saida, r.almoco);
+    const saldo = trabalhado - esperado;
+    totalSaldo += saldo;
+
+    const saldoStr = minToStr(saldo);
+    let badgeClass = saldo > 0 ? 'badge-pos' : saldo < 0 ? 'badge-neg' : 'badge-zero';
+    let diaClass = dow === 6 ? 'day-sat' : dow === 0 ? 'day-sun' : '';
+
+    const trabH = Math.floor(trabalhado/60), trabM = trabalhado%60;
+    const espH = Math.floor(esperado/60), espM = esperado%60;
+
+    return `<tr>
+      <td class="day-label">${r.data.split('-').reverse().join('/')}</td>
+      <td class="${diaClass}">${diaLabel}</td>
+      <td>${r.entrada}</td>
+      <td>${r.saida}</td>
+      <td>${r.almoco}m</td>
+      <td>${trabH}h${trabM.toString().padStart(2,'0')}m</td>
+      <td>${espH}h${espM.toString().padStart(2,'0')}m</td>
+      <td><span class="badge ${badgeClass}">${saldoStr}</span></td>
+      <td style="color:var(--muted);font-size:11px">${r.obs || ''}</td>
+      <td><button class="btn-danger" onclick="window.deletar('${r.id}')">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  const saldoEl = document.getElementById('saldoMes');
+  saldoEl.textContent = minToStr(totalSaldo);
+  saldoEl.className = 'card-value' + (totalSaldo > 0 ? '' : totalSaldo < 0 ? ' negative' : ' neutral');
+  document.getElementById('saldoDias').textContent = `${mes.length} dia${mes.length>1?'s':''} registrado${mes.length>1?'s':''}`;
+}
+
+function updateSaldoTotal() {
+  let total = 0;
+  registros.forEach(r => {
+    const esperado = getEsperado(r.data);
+    const trabalhado = workedMin(r.entrada, r.saida, r.almoco);
+    total += trabalhado - esperado;
+  });
+  const el = document.getElementById('saldoTotal');
+  el.textContent = minToStr(total);
+  el.className = 'card-value' + (total > 0 ? '' : total < 0 ? ' negative' : ' neutral');
+}
+
+window.salvar = async function() {
+  const data = document.getElementById('fData').value;
+  const entrada = document.getElementById('fEntrada').value;
+  const saida = document.getElementById('fSaida').value;
+  const almoco = document.getElementById('fAlmoco').value || '90';
+  const obs = document.getElementById('fObs').value;
+  const status = document.getElementById('status');
+
+  if (!data || !entrada || !saida) {
+    status.className = 'err'; status.textContent = '⚠ Preencha data, entrada e saída.'; return;
+  }
+
+  // Check duplicate
+  if (registros.find(r => r.data === data)) {
+    status.className = 'err'; status.textContent = '⚠ Já existe um registro para esta data.'; return;
+  }
+
+  status.className = ''; status.textContent = 'Salvando...';
+  try {
+    await addDoc(collection(db, 'pontos'), { data, entrada, saida, almoco: Number(almoco), obs });
+    status.className = 'ok'; status.textContent = '✓ Ponto salvo!';
+    document.getElementById('fData').value = '';
+    document.getElementById('fEntrada').value = '';
+    document.getElementById('fSaida').value = '';
+    document.getElementById('fObs').value = '';
+    await loadAll();
+  } catch(e) {
+    status.className = 'err'; status.textContent = '✗ Erro: ' + e.message;
+  }
+};
+
+window.deletar = async function(id) {
+  if (!confirm('Remover este registro?')) return;
+  await deleteDoc(doc(db, 'pontos', id));
+  await loadAll();
+};
+
+// Init: set today's date in form
+const today = new Date();
+const pad = n => n.toString().padStart(2,'0');
+document.getElementById('fData').value = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+
+// Auto-fill entrada based on day of week
+const dow = today.getDay();
+if (dow === 6) {
+  document.getElementById('fEntrada').value = '07:30';
+  document.getElementById('fAlmoco').value = '0';
+} else if (dow !== 0) {
+  document.getElementById('fEntrada').value = '06:30';
+}
+
+loadAll();
+</script>
+</body>
+</html>
