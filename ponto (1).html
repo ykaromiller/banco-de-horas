@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Banco de Horas</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: #2a2a3e;
+    --accent: #00e5a0;
+    --accent2: #ff4d6d;
+    --accent3: #ffd60a;
+    --accent4: #4da6ff;
+    --text: #e8e8f0;
+    --muted: #6b6b8a;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--mono); min-height: 100vh; padding: 24px 16px; }
+
+  .noise {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.4;
+  }
+
+  .container { max-width: 760px; margin: 0 auto; position: relative; z-index: 1; }
+
+  header { margin-bottom: 28px; display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  h1 { font-family: var(--sans); font-size: clamp(26px, 6vw, 40px); font-weight: 800; letter-spacing: -1px; line-height: 1; }
+  h1 span { color: var(--accent); }
+  .live-clock { font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--accent); letter-spacing: 2px; }
+  .live-date { font-size: 11px; color: var(--muted); margin-top: 2px; text-align: right; }
+
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+  .card-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
+  .card-value { font-family: var(--sans); font-size: 26px; font-weight: 700; color: var(--accent); }
+  .card-value.negative { color: var(--accent2); }
+  .card-value.neutral { color: var(--accent3); }
+  .card-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  .month-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; }
+  .month-nav button { background: none; border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: var(--mono); transition: all .15s; }
+  .month-nav button:hover { border-color: var(--accent); color: var(--accent); }
+  #monthLabel { flex: 1; text-align: center; font-family: var(--sans); font-weight: 700; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; }
+
+  .quick-card { background: var(--surface); border: 1px solid var(--accent); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+  .quick-title { font-family: var(--sans); font-weight: 700; font-size: 13px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .dot-live { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  .quick-times { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  .time-slot { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; transition: all .2s; }
+  .time-slot:hover { border-color: var(--accent4); }
+  .time-slot.filled { border-color: var(--accent); background: rgba(0,229,160,.07); }
+  .time-slot.filled:hover { border-color: var(--accent2); background: rgba(255,77,109,.07); }
+  .time-slot-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .time-slot-value { font-size: 16px; font-weight: 700; color: var(--text); }
+  .time-slot.filled .time-slot-value { color: var(--accent); }
+  .time-slot-hint { font-size: 9px; color: var(--muted); margin-top: 3px; }
+  .time-slot.filled .time-slot-hint { color: var(--accent2); }
+
+  .btn-salvar-hoje { width: 100%; background: var(--accent); color: #000; border: none; border-radius: 8px; padding: 12px; font-family: var(--sans); font-weight: 800; font-size: 14px; cursor: pointer; transition: opacity .15s, transform .1s; letter-spacing: .5px; }
+  .btn-salvar-hoje:hover { opacity: .85; }
+  .btn-salvar-hoje:active { transform: scale(.98); }
+  .btn-salvar-hoje:disabled { opacity: .4; cursor: not-allowed; }
+
+  .form-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+  .form-title { font-family: var(--sans); font-weight: 700; font-size: 13px; margin-bottom: 0; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+  .form-title:hover { color: var(--text); }
+  .form-body { overflow: hidden; max-height: 0; transition: max-height .3s; }
+  .form-body-inner { padding-top: 16px; }
+  .form-row { display: grid; gap: 12px; margin-bottom: 12px; }
+  .form-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .form-row-2 { grid-template-columns: 1fr 1fr; }
+
+  label { display: block; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+  input[type="date"], input[type="time"], input[type="text"] {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: var(--mono); font-size: 13px; padding: 10px 12px; outline: none; transition: border-color .15s;
+  }
+  input:focus { border-color: var(--accent); }
+
+  .btn { background: var(--accent); color: #000; border: none; border-radius: 8px; padding: 11px 24px; font-family: var(--sans); font-weight: 700; font-size: 13px; cursor: pointer; transition: opacity .15s, transform .1s; letter-spacing: .5px; }
+  .btn:hover { opacity: .85; }
+  .btn:active { transform: scale(.98); }
+  .btn:disabled { opacity:.4; cursor:not-allowed; }
+
+  .btn-danger { background: none; border: 1px solid var(--accent2); color: var(--accent2); border-radius: 6px; padding: 4px 8px; font-size: 11px; cursor: pointer; font-family: var(--mono); transition: all .15s; }
+  .btn-danger:hover { background: var(--accent2); color: #fff; }
+
+  #status, #statusManual { font-size: 12px; margin-top: 10px; min-height: 18px; }
+  .ok { color: var(--accent) !important; }
+  .err { color: var(--accent2) !important; }
+  .warn { color: var(--accent3) !important; }
+
+  .firebase-notice { background: rgba(255,214,10,.08); border: 1px solid rgba(255,214,10,.3); border-radius: 10px; padding: 14px 16px; margin-bottom: 20px; font-size: 12px; color: var(--accent3); line-height: 1.8; }
+  .firebase-notice strong { font-weight: 700; }
+  .firebase-notice code { background: rgba(255,214,10,.15); border-radius: 4px; padding: 2px 6px; font-size: 11px; display: block; margin-top: 6px; word-break: break-all; }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead tr { border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-size: 9px; padding: 10px 8px; text-align: left; font-weight: 400; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody tr:last-child { border-bottom: none; }
+  td { padding: 10px 8px; vertical-align: middle; }
+
+  .badge { display: inline-block; border-radius: 4px; padding: 2px 7px; font-size: 11px; font-weight: 600; }
+  .badge-pos { background: rgba(0,229,160,.15); color: var(--accent); }
+  .badge-neg { background: rgba(255,77,109,.15); color: var(--accent2); }
+  .badge-zero { background: rgba(255,214,10,.15); color: var(--accent3); }
+
+  .day-sat { color: var(--accent3); font-weight: 600; }
+  .day-sun { color: var(--muted); font-style: italic; }
+  .empty { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
+
+  @media (max-width: 520px) {
+    .quick-times { grid-template-columns: 1fr 1fr; }
+    .form-row-3 { grid-template-columns: 1fr 1fr; }
+    .summary-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+<div class="container">
+
+  <header>
+    <div>
+      <h1>BANCO DE <span>HORAS</span></h1>
+    </div>
+    <div>
+      <div class="live-clock" id="liveClock">--:--:--</div>
+      <div class="live-date" id="liveDate"></div>
+    </div>
+  </header>
+
+  <div class="firebase-notice" id="fbNotice">
+    ⚠ <strong>Se os dados não estiverem salvando:</strong> Vá ao Firebase Console → Firestore Database → Regras e substitua por:
+    <code>rules_version = '2'; service cloud.firestore { match /databases/{database}/documents { match /{document=**} { allow read, write: if true; } } }</code>
+    Depois clique em <strong>Publicar</strong>. <span style="cursor:pointer;text-decoration:underline;color:var(--accent3)" onclick="document.getElementById('fbNotice').style.display='none'">[ fechar ]</span>
+  </div>
+
+  <div class="summary-grid">
+    <div class="card">
+      <div class="card-label">Saldo do Mês</div>
+      <div class="card-value" id="saldoMes">+0h 00m</div>
+      <div class="card-sub" id="saldoDias">0 dias registrados</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Saldo Acumulado</div>
+      <div class="card-value" id="saldoTotal">+0h 00m</div>
+      <div class="card-sub">todos os meses</div>
+    </div>
+  </div>
+
+  <div class="month-nav">
+    <button onclick="changeMonth(-1)">&#8592;</button>
+    <div id="monthLabel"></div>
+    <button onclick="changeMonth(1)">&#8594;</button>
+  </div>
+
+  <!-- PONTO RÁPIDO -->
+  <div class="quick-card">
+    <div class="quick-title"><span class="dot-live"></span> Ponto de Hoje — Clique para registrar</div>
+    <div class="quick-times">
+      <div class="time-slot" id="slot-entrada" onclick="baterPonto('entrada')">
+        <div class="time-slot-label">Entrada</div>
+        <div class="time-slot-value" id="val-entrada">--:--</div>
+        <div class="time-slot-hint">clique para bater</div>
+      </div>
+      <div class="time-slot" id="slot-almoco-saida" onclick="baterPonto('almoco-saida')">
+        <div class="time-slot-label">Saída Almoço</div>
+        <div class="time-slot-value" id="val-almoco-saida">--:--</div>
+        <div class="time-slot-hint">clique para bater</div>
+      </div>
+      <div class="time-slot" id="slot-almoco-volta" onclick="baterPonto('almoco-volta')">
+        <div class="time-slot-label">Volta Almoço</div>
+        <div class="time-slot-value" id="val-almoco-volta">--:--</div>
+        <div class="time-slot-hint">clique para bater</div>
+      </div>
+      <div class="time-slot" id="slot-saida" onclick="baterPonto('saida')">
+        <div class="time-slot-label">Saída</div>
+        <div class="time-slot-value" id="val-saida">--:--</div>
+        <div class="time-slot-hint">clique para bater</div>
+      </div>
+    </div>
+    <button class="btn-salvar-hoje" id="btnSalvarHoje" onclick="salvarHoje()" disabled>SALVAR DIA</button>
+    <div id="status"></div>
+  </div>
+
+  <!-- REGISTRO MANUAL -->
+  <div class="form-card">
+    <div class="form-title" onclick="toggleManual()">
+      <span>&#9998; Registro Manual</span>
+      <span id="toggleArrow">&#9660;</span>
+    </div>
+    <div class="form-body" id="formBody">
+      <div class="form-body-inner">
+        <div class="form-row form-row-3">
+          <div>
+            <label>Data</label>
+            <input type="date" id="fData">
+          </div>
+          <div>
+            <label>Entrada</label>
+            <input type="time" id="fEntrada">
+          </div>
+          <div>
+            <label>Saída do Dia</label>
+            <input type="time" id="fSaida">
+          </div>
+        </div>
+        <div class="form-row form-row-3">
+          <div>
+            <label>Saída Almoço</label>
+            <input type="time" id="fAlmocoSaida">
+          </div>
+          <div>
+            <label>Volta Almoço</label>
+            <input type="time" id="fAlmocoVolta">
+          </div>
+          <div>
+            <label>Observação</label>
+            <input type="text" id="fObs" placeholder="Opcional">
+          </div>
+        </div>
+        <button class="btn" id="btnManual" onclick="salvarManual()">SALVAR MANUAL</button>
+        <div id="statusManual"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABELA -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Dia</th>
+          <th>Entrada</th>
+          <th>S.Almoço</th>
+          <th>V.Almoço</th>
+          <th>Saída</th>
+          <th>Trabalhado</th>
+          <th>Esperado</th>
+          <th>Saldo</th>
+          <th>Obs</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="11" class="empty">Carregando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCHDBdUi1-ze8fF-eGaWqBo-z0F_ARdGI0",
+  authDomain: "kiing-of-street.firebaseapp.com",
+  projectId: "kiing-of-street",
+  storageBucket: "kiing-of-street.firebasestorage.app",
+  messagingSenderId: "779262130062",
+  appId: "1:779262130062:web:a1de619cc1547d2b8196df"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const ESPERADO_SEMANA = 8 * 60;
+const ESPERADO_SABADO = 3.5 * 60;
+const DIAS_PT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+let currentYear = new Date().getFullYear();
+let currentMonth = new Date().getMonth();
+let registros = [];
+let pontoHoje = { entrada: null, 'almoco-saida': null, 'almoco-volta': null, saida: null };
+
+// Relógio
+function updateClock() {
+  const now = new Date();
+  const pad = n => n.toString().padStart(2,'0');
+  document.getElementById('liveClock').textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  document.getElementById('liveDate').textContent = `${DIAS_PT[now.getDay()]}, ${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+function nowTime() {
+  const now = new Date();
+  const pad = n => n.toString().padStart(2,'0');
+  return `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
+function todayStr() {
+  const now = new Date();
+  const pad = n => n.toString().padStart(2,'0');
+  return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+}
+
+function timeToMin(t) {
+  if (!t) return null;
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function minToStr(m) {
+  const sign = m >= 0 ? '+' : '-';
+  const abs = Math.abs(m);
+  return `${sign}${Math.floor(abs/60)}h ${(abs%60).toString().padStart(2,'0')}m`;
+}
+
+function getEsperado(dateStr) {
+  const dow = new Date(dateStr + 'T12:00:00').getDay();
+  if (dow === 0) return 0;
+  if (dow === 6) return ESPERADO_SABADO;
+  return ESPERADO_SEMANA;
+}
+
+function calcTrabalhado(r) {
+  if (!r.entrada || !r.saida) return 0;
+  let total = timeToMin(r.saida) - timeToMin(r.entrada);
+  if (r.almocoSaida && r.almocoVolta) {
+    const dur = timeToMin(r.almocoVolta) - timeToMin(r.almocoSaida);
+    if (dur > 0) total -= dur;
+  }
+  return Math.max(0, total);
+}
+
+// Ponto de hoje — persiste no localStorage até salvar
+function loadLocalPonto() {
+  try {
+    const saved = localStorage.getItem('ponto_hoje_' + todayStr());
+    if (saved) pontoHoje = JSON.parse(saved);
+  } catch(e) {}
+  renderPontoHoje();
+}
+
+function saveLocalPonto() {
+  localStorage.setItem('ponto_hoje_' + todayStr(), JSON.stringify(pontoHoje));
+}
+
+window.baterPonto = function(tipo) {
+  if (pontoHoje[tipo]) {
+    const labels = { 'entrada': 'Entrada', 'almoco-saida': 'Saída do Almoço', 'almoco-volta': 'Volta do Almoço', 'saida': 'Saída' };
+    if (!confirm(`Limpar o horário de "${labels[tipo]}" (${pontoHoje[tipo]})?`)) return;
+    pontoHoje[tipo] = null;
+  } else {
+    pontoHoje[tipo] = nowTime();
+  }
+  saveLocalPonto();
+  renderPontoHoje();
+};
+
+function renderPontoHoje() {
+  ['entrada','almoco-saida','almoco-volta','saida'].forEach(k => {
+    const slot = document.getElementById('slot-' + k);
+    const val = document.getElementById('val-' + k);
+    const hint = slot.querySelector('.time-slot-hint');
+    if (pontoHoje[k]) {
+      slot.classList.add('filled');
+      val.textContent = pontoHoje[k];
+      hint.textContent = 'clique p/ limpar';
+    } else {
+      slot.classList.remove('filled');
+      val.textContent = '--:--';
+      hint.textContent = 'clique para bater';
+    }
+  });
+  document.getElementById('btnSalvarHoje').disabled = !(pontoHoje.entrada && pontoHoje.saida);
+}
+
+window.salvarHoje = async function() {
+  const status = document.getElementById('status');
+  const btn = document.getElementById('btnSalvarHoje');
+  const data = todayStr();
+
+  if (registros.find(r => r.data === data)) {
+    status.className = 'err'; status.textContent = '⚠ Já existe um registro para hoje.'; return;
+  }
+
+  btn.disabled = true;
+  status.className = 'warn'; status.textContent = '⏳ Salvando no Firebase...';
+
+  try {
+    await addDoc(collection(db, 'pontos'), {
+      data,
+      entrada: pontoHoje.entrada,
+      saida: pontoHoje.saida,
+      almocoSaida: pontoHoje['almoco-saida'] || '',
+      almocoVolta: pontoHoje['almoco-volta'] || '',
+      obs: ''
+    });
+    status.className = 'ok'; status.textContent = '✓ Dia salvo com sucesso!';
+    localStorage.removeItem('ponto_hoje_' + data);
+    pontoHoje = { entrada: null, 'almoco-saida': null, 'almoco-volta': null, saida: null };
+    renderPontoHoje();
+    await loadAll();
+  } catch(e) {
+    btn.disabled = false;
+    status.className = 'err';
+    status.textContent = e.code === 'permission-denied'
+      ? '✗ PERMISSÃO NEGADA — Ajuste as regras do Firestore (veja aviso acima)'
+      : '✗ Erro: ' + e.message;
+  }
+};
+
+// Manual form toggle
+window.toggleManual = function() {
+  const body = document.getElementById('formBody');
+  const arrow = document.getElementById('toggleArrow');
+  const isOpen = body.style.maxHeight && body.style.maxHeight !== '0px';
+  body.style.maxHeight = isOpen ? '0' : '500px';
+  arrow.textContent = isOpen ? '▼' : '▲';
+};
+
+window.salvarManual = async function() {
+  const data = document.getElementById('fData').value;
+  const entrada = document.getElementById('fEntrada').value;
+  const saida = document.getElementById('fSaida').value;
+  const almocoSaida = document.getElementById('fAlmocoSaida').value;
+  const almocoVolta = document.getElementById('fAlmocoVolta').value;
+  const obs = document.getElementById('fObs').value;
+  const status = document.getElementById('statusManual');
+  const btn = document.getElementById('btnManual');
+
+  if (!data || !entrada || !saida) {
+    status.className = 'err'; status.textContent = '⚠ Preencha data, entrada e saída.'; return;
+  }
+  if (registros.find(r => r.data === data)) {
+    status.className = 'err'; status.textContent = '⚠ Já existe um registro para esta data.'; return;
+  }
+
+  btn.disabled = true;
+  status.className = 'warn'; status.textContent = '⏳ Salvando no Firebase...';
+
+  try {
+    await addDoc(collection(db, 'pontos'), { data, entrada, saida, almocoSaida, almocoVolta, obs });
+    status.className = 'ok'; status.textContent = '✓ Registro salvo!';
+    ['fData','fEntrada','fSaida','fAlmocoSaida','fAlmocoVolta','fObs'].forEach(id => document.getElementById(id).value = '');
+    btn.disabled = false;
+    await loadAll();
+  } catch(e) {
+    btn.disabled = false;
+    status.className = 'err';
+    status.textContent = e.code === 'permission-denied'
+      ? '✗ PERMISSÃO NEGADA — Ajuste as regras do Firestore (veja aviso acima)'
+      : '✗ Erro: ' + e.message;
+  }
+};
+
+window.deletar = async function(id) {
+  if (!confirm('Remover este registro?')) return;
+  try {
+    await deleteDoc(doc(db, 'pontos', id));
+    await loadAll();
+  } catch(e) { alert('Erro ao deletar: ' + e.message); }
+};
+
+window.changeMonth = function(d) {
+  currentMonth += d;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  renderMonth();
+};
+
+async function loadAll() {
+  try {
+    const snap = await getDocs(collection(db, 'pontos'));
+    registros = [];
+    snap.forEach(d => registros.push({ id: d.id, ...d.data() }));
+    renderMonth();
+    updateSaldoTotal();
+  } catch(e) {
+    const msg = e.code === 'permission-denied'
+      ? '✗ Permissão negada. Ajuste as regras do Firestore conforme o aviso acima.'
+      : '✗ Erro ao carregar: ' + e.message;
+    document.getElementById('tbody').innerHTML = `<tr><td colspan="11" class="empty" style="color:var(--accent2)">${msg}</td></tr>`;
+  }
+}
+
+function renderMonth() {
+  document.getElementById('monthLabel').textContent = `${MESES_PT[currentMonth]} ${currentYear}`;
+
+  const mes = registros
+    .filter(r => {
+      const d = new Date(r.data + 'T12:00:00');
+      return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+    })
+    .sort((a, b) => a.data.localeCompare(b.data));
+
+  const tbody = document.getElementById('tbody');
+
+  if (!mes.length) {
+    tbody.innerHTML = `<tr><td colspan="11" class="empty">Nenhum registro neste mês.</td></tr>`;
+    document.getElementById('saldoMes').textContent = '+0h 00m';
+    document.getElementById('saldoMes').className = 'card-value';
+    document.getElementById('saldoDias').textContent = '0 dias registrados';
+    return;
+  }
+
+  let totalSaldo = 0;
+
+  tbody.innerHTML = mes.map(r => {
+    const dow = new Date(r.data + 'T12:00:00').getDay();
+    const esperado = getEsperado(r.data);
+    const trabalhado = calcTrabalhado(r);
+    const saldo = trabalhado - esperado;
+    totalSaldo += saldo;
+
+    const badgeClass = saldo > 0 ? 'badge-pos' : saldo < 0 ? 'badge-neg' : 'badge-zero';
+    const diaClass = dow === 6 ? 'day-sat' : dow === 0 ? 'day-sun' : '';
+    const trabH = Math.floor(trabalhado/60), trabM = trabalhado%60;
+    const espH = Math.floor(esperado/60), espM = esperado%60;
+
+    return `<tr>
+      <td style="font-weight:600">${r.data.split('-').reverse().join('/')}</td>
+      <td class="${diaClass}">${DIAS_PT[dow]}</td>
+      <td>${r.entrada}</td>
+      <td>${r.almocoSaida || '—'}</td>
+      <td>${r.almocoVolta || '—'}</td>
+      <td>${r.saida}</td>
+      <td style="font-weight:600">${trabH}h${trabM.toString().padStart(2,'0')}m</td>
+      <td style="color:var(--muted)">${espH}h${espM.toString().padStart(2,'0')}m</td>
+      <td><span class="badge ${badgeClass}">${minToStr(saldo)}</span></td>
+      <td style="color:var(--muted);font-size:11px">${r.obs || ''}</td>
+      <td><button class="btn-danger" onclick="window.deletar('${r.id}')">&#10005;</button></td>
+    </tr>`;
+  }).join('');
+
+  const saldoEl = document.getElementById('saldoMes');
+  saldoEl.textContent = minToStr(totalSaldo);
+  saldoEl.className = 'card-value' + (totalSaldo > 0 ? '' : totalSaldo < 0 ? ' negative' : ' neutral');
+  document.getElementById('saldoDias').textContent = `${mes.length} dia${mes.length > 1 ? 's' : ''} registrado${mes.length > 1 ? 's' : ''}`;
+}
+
+function updateSaldoTotal() {
+  const total = registros.reduce((acc, r) => acc + calcTrabalhado(r) - getEsperado(r.data), 0);
+  const el = document.getElementById('saldoTotal');
+  el.textContent = minToStr(total);
+  el.className = 'card-value' + (total > 0 ? '' : total < 0 ? ' negative' : ' neutral');
+}
+
+// Init
+const now = new Date();
+const pad = n => n.toString().padStart(2,'0');
+document.getElementById('fData').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+loadLocalPonto();
+loadAll();
+</script>
+</body>
+</html>
